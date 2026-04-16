@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, Lock, Eye, EyeOff } from 'lucide-react';
-import { MOCK_USERS } from '../data/users';
+import { buildApiUrl } from '../config/api';
 
 const LoginForm = ({ onLoginSuccess }) => {
   const [correo, setCorreo] = useState('');
@@ -15,7 +15,7 @@ const LoginForm = ({ onLoginSuccess }) => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch(buildApiUrl('/api/auth/login'), {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json' 

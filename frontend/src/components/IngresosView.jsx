@@ -1,7 +1,8 @@
-﻿import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Plus, Save, CalendarDays, X } from 'lucide-react';
+import { buildApiUrl } from '../config/api';
 
-const API_URL = 'http://localhost:5000/api/movimientos/ingresos';
+const API_URL = buildApiUrl('/api/movimientos/ingresos');
 
 const TIPOS_COMPROBANTE = [
   'Factura',

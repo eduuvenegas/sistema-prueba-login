@@ -12,7 +12,6 @@ const ConsolidadoView = ({ trimestreId, schoolName }) => {
   const actual = periodos[trimestreId];
 
   // Estilos de celda para imitar el formato oficial
-  const thClass = 'border border-gray-800 bg-gray-50 px-3 py-2 text-left text-xs font-bold uppercase text-gray-600';
   const tdLabelClass = 'border border-gray-800 px-3 py-2 text-sm text-gray-700';
   const tdValueClass = 'border border-gray-800 px-3 py-2 text-sm text-right font-mono';
   const sectionHeaderClass = 'bg-sky-500 text-white px-3 py-1.5 font-bold text-sm uppercase tracking-wide border border-sky-600 text-center';
