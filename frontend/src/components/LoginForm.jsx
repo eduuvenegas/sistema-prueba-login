@@ -29,22 +29,36 @@ const LoginForm = ({ onLoginSuccess }) => {
       const data = await response.json();
 
       if (response.ok && data.success) {
-        // Pasar el usuario completo (incluyendo datos del director)
-        onLoginSuccess(data.user);
+        // Pequeña pausa artificial para mostrar la animación fluida antes de cambiar de vista
+        setTimeout(() => {
+          onLoginSuccess(data.user);
+        }, 1500); 
       } else {
         setError(data.message || 'Error en la autenticación');
+        setLoading(false);
       }
     } catch (error) {
       console.error('Error de conexión:', error);
       setError('Error conectando con el servidor');
-    } finally {
       setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-blue-50 flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-center">
+      <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-center relative overflow-hidden">
+        
+        {/* Overlay de Carga con Medio Círculo Giratorio */}
+        {loading && (
+          <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center z-50">
+            {/* Spinner (Medio círculo azul gracias a border-t y border-b transparentes) */}
+            <div className="w-16 h-16 border-4 border-blue-100 border-t-blue-600 border-r-blue-600 rounded-full animate-spin mb-4 shadow-sm"></div>
+            <p className="text-blue-700 font-bold animate-pulse tracking-wide">
+              Ingresando al sistema...
+            </p>
+          </div>
+        )}
+
         {/* Logo Real desde URL */}
         <div className="mb-6 flex justify-center">
           <img 

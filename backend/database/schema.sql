@@ -170,6 +170,56 @@ CREATE TABLE IF NOT EXISTS egresos (
   COMMENT='Egresos registrados por directores';
 
 -- ============================================
+-- TABLA 7: cierres_trimestrales
+-- Descripcion: Bloquea cambios por director, anio y trimestre
+-- ============================================
+CREATE TABLE IF NOT EXISTS cierres_trimestrales (
+  id                      INT AUTO_INCREMENT PRIMARY KEY,
+  director_id             INT NOT NULL,
+  anio                    INT NOT NULL,
+  trimestre               TINYINT NOT NULL,
+  cerrado_en              TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_cierres_trimestrales_director
+    FOREIGN KEY (director_id)
+    REFERENCES directores(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+
+  CONSTRAINT chk_cierres_trimestrales_trimestre
+    CHECK (trimestre BETWEEN 1 AND 4),
+
+  UNIQUE KEY uk_cierre_trimestre (director_id, anio, trimestre),
+  INDEX idx_cierres_trimestrales_director (director_id, anio, trimestre)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Trimestres cerrados por director';
+
+-- ============================================
+-- TABLA 8: sustentos_pdf
+-- Descripción: Almacena los metadatos y rutas de los archivos PDF subidos
+-- ============================================
+CREATE TABLE IF NOT EXISTS sustentos_pdf (
+  id                      INT AUTO_INCREMENT PRIMARY KEY,
+  director_id             INT NOT NULL COMMENT 'FK al director que subió el archivo',
+  nombre_original         VARCHAR(255) NOT NULL COMMENT 'Ej: Reporte_Marzo.pdf',
+  ruta_archivo            VARCHAR(500) NOT NULL COMMENT 'Ruta física en el servidor',
+  tamanio_bytes           INT COMMENT 'Tamaño del archivo en bytes',
+  anio                    INT NOT NULL,
+  trimestre               TINYINT,
+  subido_en               TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT fk_sustentos_director
+    FOREIGN KEY (director_id)
+    REFERENCES directores(id)
+    ON DELETE CASCADE
+    ON UPDATE CASCADE,
+
+  INDEX idx_sustentos_director (director_id),
+  INDEX idx_sustentos_anio_trimestre (anio, trimestre)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  COMMENT='Metadatos de los PDFs de sustento subidos por directores';
+
+-- ============================================
 -- DATOS DE EJEMPLO
 -- ============================================
 

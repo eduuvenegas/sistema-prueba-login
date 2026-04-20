@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Plus, Save, CalendarDays, X } from 'lucide-react';
 import { buildApiUrl } from '../config/api';
+import Toast from './Toast';
 
 const API_URL = buildApiUrl('/api/movimientos/egresos');
 
@@ -66,7 +67,7 @@ const leerRespuestaJson = async (response) => {
   }
 };
 
-const EgresosView = ({ trimestreMeses, trimestreId, directorId }) => {
+const EgresosView = ({ trimestreMeses, trimestreId, directorId, trimestreCerrado }) => {
   const dateInputRefs = useRef({});
   const [mesActivo, setMesActivo] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -177,6 +178,8 @@ const EgresosView = ({ trimestreMeses, trimestreId, directorId }) => {
   };
 
   const agregarFila = (mesIndex) => {
+    if (trimestreCerrado) return;
+
     setDatosMeses((prevDatos) => {
       const nuevosDatos = [...prevDatos];
       nuevosDatos[mesIndex] = [...nuevosDatos[mesIndex], crearFilaVacia()];
@@ -185,6 +188,8 @@ const EgresosView = ({ trimestreMeses, trimestreId, directorId }) => {
   };
 
   const eliminarFila = (mesIndex, filaId) => {
+    if (trimestreCerrado) return;
+
     setDatosMeses((prevDatos) => {
       const nuevosDatos = [...prevDatos];
       const filtradas = nuevosDatos[mesIndex].filter((fila) => fila.id !== filaId);
@@ -217,6 +222,11 @@ const EgresosView = ({ trimestreMeses, trimestreId, directorId }) => {
   };
 
   const guardarMesActual = async () => {
+    if (trimestreCerrado) {
+      setError('Este trimestre esta cerrado y no admite cambios.');
+      return;
+    }
+
     if (!directorId) {
       setError('No se encontro el director logueado.');
       return;
@@ -279,39 +289,46 @@ const EgresosView = ({ trimestreMeses, trimestreId, directorId }) => {
     }
   };
 
-  const inputClass = 'w-full p-1 outline-none bg-transparent';
+  const inputClass = 'w-full p-2 outline-none bg-transparent text-slate-800 font-medium focus:bg-white focus:ring-2 focus:ring-rose-500/20 rounded transition-all';
 
   return (
-    <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-      <div className="flex bg-gray-50 border-b border-gray-200">
+    <div className="max-w-6xl mx-auto space-y-6">
+      <div className="bg-white p-8 rounded-[28px] shadow-[0_24px_60px_-30px_rgba(15,23,42,0.45)] border border-slate-200">
+        <div className="flex gap-2 mb-8 bg-slate-50 p-2 rounded-2xl border border-slate-200 overflow-x-auto">
         {trimestreMeses.map((mes, index) => (
           <button
             key={mes}
             onClick={() => setMesActivo(index)}
-            className={`px-8 py-4 text-sm font-bold transition-all border-r border-gray-200 flex items-center gap-2 ${
+            className={`flex-1 px-6 py-3 text-sm font-bold rounded-xl transition-all flex items-center justify-center gap-2 ${
               mesActivo === index
-                ? 'bg-white text-red-900 border-t-4 border-t-red-800 shadow-sm'
-                : 'text-gray-400 hover:bg-gray-100'
+                ? 'bg-white text-rose-700 shadow-sm border border-slate-200'
+                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
             }`}
           >
-            <CalendarDays size={16} />
+            <CalendarDays size={18} />
             {mes.toUpperCase()}
           </button>
         ))}
       </div>
 
-      <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-gray-800">
-            RELACION DE EGRESOS - {trimestreMeses[mesActivo].toUpperCase()}
+        <div className="flex justify-between items-center mb-6 rounded-3xl border border-slate-300 bg-slate-50/80 p-5 shadow-sm">
+          <h2 className="text-lg font-bold text-slate-800 uppercase tracking-wide">
+            RELACIÓN DE EGRESOS - {trimestreMeses[mesActivo].toUpperCase()}
           </h2>
           <button
             onClick={() => agregarFila(mesActivo)}
-            className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700 transition-all shadow-md font-medium"
+            disabled={trimestreCerrado}
+            className="flex items-center gap-2 bg-rose-600 text-white px-5 py-2.5 rounded-xl text-sm hover:bg-rose-700 transition-all shadow-md font-bold disabled:cursor-not-allowed disabled:bg-slate-400"
           >
             <Plus size={18} /> Agregar Fila
           </button>
         </div>
+
+        {trimestreCerrado && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+            Este trimestre esta cerrado. Puede revisar la informacion, pero no editarla.
+          </div>
+        )}
 
         {loading && (
           <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
@@ -319,40 +336,34 @@ const EgresosView = ({ trimestreMeses, trimestreId, directorId }) => {
           </div>
         )}
 
-        {mensaje && (
-          <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            {mensaje}
-          </div>
-        )}
+      <Toast message={mensaje} type="success" onClose={() => setMensaje('')} />
+      <Toast message={error} type="error" onClose={() => setError('')} />
 
-        {error && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse border border-gray-300 text-sm">
+        <div className="overflow-x-auto rounded-[26px] border border-slate-300 shadow-sm">
+          <table className="w-full border-collapse bg-white text-sm">
             <thead>
-              <tr className="bg-gray-100">
-                <th className="border border-gray-300 p-2 w-10">N°</th>
-                <th className="border border-gray-300 p-2 w-24">Fecha</th>
-                <th className="border border-gray-300 p-2 w-32">Tipo de Comprobante</th>
-                <th className="border border-gray-300 p-2 w-32">Numero Comprobante</th>
-                <th className="border border-gray-300 p-2">Concepto</th>
-                <th className="border border-gray-300 p-2 w-32">Importe (S/.)</th>
-                <th className="border border-gray-300 p-2 w-12">Accion</th>
+              <tr className="bg-gradient-to-r from-rose-600 to-red-600 text-white">
+                <th className="border border-rose-700/50 px-4 py-3 font-bold uppercase tracking-wider w-12 text-center text-xs">N°</th>
+                <th className="border border-rose-700/50 px-4 py-3 font-bold uppercase tracking-wider w-28 text-center text-xs">Fecha</th>
+                <th className="border border-rose-700/50 px-4 py-3 font-bold uppercase tracking-wider w-40 text-center text-xs">Tipo Comprobante</th>
+                <th className="border border-rose-700/50 px-4 py-3 font-bold uppercase tracking-wider w-36 text-center text-xs">N° Comprobante</th>
+                <th className="border border-rose-700/50 px-4 py-3 font-bold uppercase tracking-wider text-left text-xs">Concepto</th>
+                <th className="border border-rose-700/50 px-4 py-3 font-bold uppercase tracking-wider w-36 text-right text-xs">Importe (S/.)</th>
+                <th className="border border-rose-700/50 px-4 py-3 font-bold uppercase tracking-wider w-16 text-center text-xs">Acción</th>
               </tr>
             </thead>
             <tbody>
               {datosMeses[mesActivo].map((fila, index) => (
-                <tr key={fila.id} className="hover:bg-red-50/30">
-                  <td className="border border-gray-300 p-2 text-center bg-gray-50">{index + 1}</td>
-                  <td className="border border-gray-300 p-1">
+                <tr key={fila.id} className="hover:bg-slate-50/80 transition-colors group/row">
+                  <td className="border border-slate-300 px-2 py-2 text-center bg-slate-50 font-medium text-slate-500">{index + 1}</td>
+                  <td className="border border-slate-300 p-1">
                     <button
                       type="button"
-                      onClick={() => abrirSelectorFecha(fila.id)}
-                      className="block w-full text-left cursor-pointer group"
+                      onClick={() => {
+                        if (!trimestreCerrado) abrirSelectorFecha(fila.id);
+                      }}
+                      disabled={trimestreCerrado}
+                      className="block w-full text-left cursor-pointer group disabled:cursor-not-allowed"
                       title="Seleccionar fecha"
                     >
                       <input
@@ -367,19 +378,21 @@ const EgresosView = ({ trimestreMeses, trimestreId, directorId }) => {
                         value={fila.fecha}
                         onChange={(e) => handleInputChange(mesActivo, fila.id, 'fecha', e.target.value)}
                         className="sr-only"
+                        disabled={trimestreCerrado}
                         tabIndex={-1}
                         aria-hidden="true"
                       />
-                      <span className="block w-full p-1 text-center font-mono text-sm text-gray-700 group-hover:bg-red-100 rounded pointer-events-none">
+                      <span className="block w-full p-2 text-center font-mono text-sm font-medium text-slate-700 group-hover:bg-slate-200 rounded transition-colors pointer-events-none">
                         {fila.fecha ? formatearFechaDDMM(fila.fecha) : '--'}
                       </span>
                     </button>
                   </td>
-                  <td className="border border-gray-300 p-1">
+                  <td className="border border-slate-300 p-1">
                     <select
                       value={fila.tipo}
                       onChange={(e) => handleInputChange(mesActivo, fila.id, 'tipo', e.target.value)}
-                      className={`${inputClass} ${filasTipoInvalido.has(fila.id) ? 'border border-red-500 rounded' : ''}`}
+                      disabled={trimestreCerrado}
+                      className={`${inputClass} ${filasTipoInvalido.has(fila.id) ? 'ring-2 ring-red-500 bg-red-50' : ''}`}
                     >
                       <option value="">Seleccionar</option>
                       {TIPOS_COMPROBANTE.map((tipo) => (
@@ -392,34 +405,45 @@ const EgresosView = ({ trimestreMeses, trimestreId, directorId }) => {
                       <p className="px-1 pt-1 text-xs text-red-600">Campo obligatorio</p>
                     )}
                   </td>
-                  <td className="border border-gray-300 p-1">
+                  <td className="border border-slate-300 p-1">
                     <input
                       type="text"
                       value={fila.numero}
                       onChange={(e) => handleInputChange(mesActivo, fila.id, 'numero', e.target.value)}
+                      disabled={trimestreCerrado}
                       className={inputClass}
                     />
                   </td>
-                  <td className="border border-gray-300 p-1">
+                  <td className="border border-slate-300 p-1">
                     <input
                       type="text"
                       value={fila.concepto}
                       onChange={(e) => handleInputChange(mesActivo, fila.id, 'concepto', e.target.value)}
+                      disabled={trimestreCerrado}
                       className={inputClass}
                     />
                   </td>
-                  <td className="border border-gray-300 p-1">
+                  <td className="border border-slate-300 p-1">
                     <input
                       type="number"
+                      min="0"
+                      step="0.01"
+                      onKeyDown={(e) => { if (e.key === '-' || e.key === 'e') e.preventDefault(); }}
                       value={fila.importe}
-                      onChange={(e) => handleInputChange(mesActivo, fila.id, 'importe', e.target.value)}
-                      className={`${inputClass} text-right font-mono text-base text-black-700`}
+                      onChange={(e) => {
+                        if (Number(e.target.value) >= 0) {
+                          handleInputChange(mesActivo, fila.id, 'importe', e.target.value);
+                        }
+                      }}
+                      disabled={trimestreCerrado}
+                      className={`${inputClass} text-right font-mono text-base`}
                     />
                   </td>
-                  <td className="border border-gray-300 p-1 text-center">
+                  <td className="border border-slate-300 p-1 text-center">
                     <button
                       onClick={() => eliminarFila(mesActivo, fila.id)}
-                      className="bg-yellow-500 text-white p-1 rounded hover:bg-yellow-600 transition-all"
+                      disabled={trimestreCerrado}
+                      className="bg-slate-400 text-white p-1.5 rounded-lg hover:bg-rose-600 transition-all disabled:cursor-not-allowed disabled:opacity-50"
                       title="Eliminar fila"
                     >
                       <X size={16} />
@@ -427,14 +451,14 @@ const EgresosView = ({ trimestreMeses, trimestreId, directorId }) => {
                   </td>
                 </tr>
               ))}
-              <tr className="bg-gray-50 font-bold">
-                <td colSpan="5" className="border border-gray-300 p-2 text-right uppercase tracking-wider">
-                  Total
+              <tr className="bg-slate-900 text-white font-bold">
+                <td colSpan="5" className="border border-slate-700 px-4 py-3 text-right uppercase tracking-wider text-xs">
+                  Total {trimestreMeses[mesActivo]}
                 </td>
-                <td className="border border-gray-300 p-2 text-right text-red-700 font-mono text-lg bg-red-50">
+                <td className="border border-slate-700 px-4 py-3 text-right font-mono text-base text-rose-400">
                   {new Intl.NumberFormat('es-PE', { minimumFractionDigits: 2 }).format(calcularTotal(mesActivo))}
                 </td>
-                <td className="border border-gray-300 p-2 bg-transparent"></td>
+                <td className="border border-slate-700 px-4 py-3 bg-slate-900"></td>
               </tr>
             </tbody>
           </table>
@@ -444,8 +468,8 @@ const EgresosView = ({ trimestreMeses, trimestreId, directorId }) => {
           <button
             type="button"
             onClick={guardarMesActual}
-            disabled={saving || loading}
-            className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl hover:bg-gray-700 transition-all font-bold shadow-lg disabled:bg-gray-400"
+            disabled={saving || loading || trimestreCerrado}
+            className="flex items-center gap-2 bg-rose-600 text-white px-8 py-3.5 rounded-2xl hover:bg-rose-700 transition-all font-bold shadow-lg disabled:bg-slate-400 uppercase tracking-wide text-sm"
           >
             <Save size={20} /> {saving ? 'Guardando...' : 'Guardar Mes Actual'}
           </button>

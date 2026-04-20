@@ -10,7 +10,7 @@ const obtenerNombreCompleto = (director) => {
   return partes.length > 0 ? partes.join(' ') : 'No disponible';
 };
 
-const InformeGeneralView = ({ director }) => {
+const InformacionGeneralView = ({ director }) => {
   const datos = [
     { label: 'Nombre de la I.E.', value: director?.school || 'No disponible' },
     { label: 'Director(a)', value: obtenerNombreCompleto(director) },
@@ -22,7 +22,7 @@ const InformeGeneralView = ({ director }) => {
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
       <div className="w-full max-w-3xl rounded-2xl bg-white border border-gray-200 shadow-lg p-8">
-        <h2 className="text-2xl font-bold text-gray-800 text-center">INFORME GENERAL</h2>
+        <h2 className="text-2xl font-bold text-gray-800 text-center">INFORMACIÓN GENERAL</h2>
         <p className="text-center text-sm text-gray-500 mt-2 mb-8">
           Resumen de datos institucionales
         </p>
@@ -40,4 +40,4 @@ const InformeGeneralView = ({ director }) => {
   );
 };
 
-export default InformeGeneralView;
+export default InformacionGeneralView;

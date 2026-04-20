@@ -1,0 +1,14 @@
+# Dependencias de Node.js
+node_modules/
+
+# Variables de entorno (Contraseñas y configuración de BD)
+.env
+
+# Archivos subidos por los usuarios (PDFs)
+uploads/
+
+# Logs de errores
+npm-debug.log*
+
+# Archivos del sistema operativo
+.DS_Store

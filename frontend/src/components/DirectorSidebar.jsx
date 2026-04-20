@@ -7,8 +7,8 @@ const DirectorSidebar = ({ activeTab, setActiveTab, onLogoutClick }) => {
     { id: 'general', label: 'CONSOLIDADO', icon: <LayoutDashboard size={18} /> },
     { id: 'ingresos', label: 'INGRESOS', icon: <FolderOpen size={18} /> },
     { id: 'egresos', label: 'EGRESOS', icon: <FolderOpen size={18} /> },
-    { id: 'facturas', label: 'SUBIR FACTURAS', icon: <UploadCloud size={18} /> },
-    { id: 'informe', label: 'INFORME GENERAL', icon: <LayoutDashboard size={18} /> },
+    { id: 'facturas', label: 'SUBIR PDF', icon: <UploadCloud size={18} /> },
+    { id: 'informacion', label: 'INFORMACIÓN GENERAL', icon: <LayoutDashboard size={18} /> },
   ];
 
   return (
@@ -32,7 +32,7 @@ const DirectorSidebar = ({ activeTab, setActiveTab, onLogoutClick }) => {
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-sm transition-colors ${
+            className={`w-full flex items-center justify-start space-x-3 px-4 py-3 rounded-lg text-sm text-left transition-colors ${
               activeTab === item.id
                 ? 'bg-blue-50 text-blue-600 font-medium'
                 : 'text-gray-500 hover:bg-gray-100'
@@ -48,7 +48,7 @@ const DirectorSidebar = ({ activeTab, setActiveTab, onLogoutClick }) => {
       <div className="border-t border-gray-100 pt-5 mt-auto">
         <button 
           onClick={onLogoutClick}
-          className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-sm text-gray-500 hover:bg-gray-100 transition-colors"
+          className="w-full flex items-center justify-start space-x-3 px-4 py-3 rounded-lg text-sm text-left text-gray-500 hover:bg-gray-100 transition-colors"
         >
           <LogOut size={18} />
           <span>Cerrar Sesión</span>
