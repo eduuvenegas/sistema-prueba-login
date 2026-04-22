@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Save } from 'lucide-react';
+import { Save, FileText, Download } from 'lucide-react';
 import { buildApiUrl } from '../config/api';
 import Toast from './Toast';
+import { jsPDF } from 'jspdf';
+import { autoTable } from 'jspdf-autotable';
+import ExcelJS from 'exceljs';
 
 const formatearFechaCierre = (fecha) => {
   if (!fecha) return '';
@@ -34,7 +37,7 @@ const ConsolidadoView = ({
 
   const actual = periodos[trimestreId];
 
-  // Variables de estado para los inputs de la Sección 2
+  // Variables de estado para los inputs de la Seccion 2
   const [saldosBanco, setSaldosBanco] = useState({
     inicial: '',
     mes0: '',
@@ -53,16 +56,16 @@ const ConsolidadoView = ({
     setSaldosBanco((prev) => ({ ...prev, [campo]: valor }));
   };
 
-  // Cálculos automáticos
+  // Calculos automaticos
   const saldoInicialCaja = 0; // Podremos conectarlo a otro trimestre en el futuro si lo necesitas
   const totalIngresosMeses = movimientos.ingresos.reduce((sum, val) => sum + val, 0);
   const totalIngresos = saldoInicialCaja + totalIngresosMeses;
   const totalEgresos = movimientos.egresos.reduce((sum, val) => sum + val, 0);
-  
+
   const dineroEnCaja = totalIngresos - totalEgresos;
   const dineroEnBanco = parseFloat(saldosBanco.mes2 || 0);
   const saldoDineroTotal = dineroEnCaja + dineroEnBanco;
-  
+
   const formatCurrency = (val) => new Intl.NumberFormat('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(val || 0);
 
   const obtenerRangoTrimestre = (quarterId) => {
@@ -74,17 +77,18 @@ const ConsolidadoView = ({
     return { startDate: formatear(startDate), endDate: formatear(endDate), startMonth };
   };
 
-  // Cargar ingresos y egresos para la Sección 1 y 3
+  // Cargar ingresos y egresos para la Seccion 1 y 3
   useEffect(() => {
     const cargarMovimientos = async () => {
       if (!directorId || !trimestreId) return;
       try {
         const { startDate, endDate, startMonth } = obtenerRangoTrimestre(trimestreId);
         const query = new URLSearchParams({ directorId: String(directorId), startDate, endDate });
+        const headers = { 'Authorization': `Bearer ${localStorage.getItem('token')}` };
 
         const [resIngresos, resEgresos] = await Promise.all([
-          fetch(`${buildApiUrl('/api/movimientos/ingresos')}?${query.toString()}`),
-          fetch(`${buildApiUrl('/api/movimientos/egresos')}?${query.toString()}`)
+          fetch(`${buildApiUrl('/api/movimientos/ingresos')}?${query.toString()}`, { headers }),
+          fetch(`${buildApiUrl('/api/movimientos/egresos')}?${query.toString()}`, { headers })
         ]);
 
         const sumMeses = (data) => {
@@ -113,17 +117,19 @@ const ConsolidadoView = ({
   useEffect(() => {
     const cargarSaldos = async () => {
       if (!directorId || !trimestreId) return;
-      
+
       try {
-        const query = new URLSearchParams({ 
-          directorId: String(directorId), 
-          trimestreId: String(trimestreId), 
-          anio: '2026' 
+        const query = new URLSearchParams({
+          directorId: String(directorId),
+          trimestreId: String(trimestreId),
+          anio: '2026'
         });
-        
-        const res = await fetch(`${SALDOS_API_URL}?${query.toString()}`);
+
+        const res = await fetch(`${SALDOS_API_URL}?${query.toString()}`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
         const data = await res.json();
-        
+
         if (res.ok && data.success && data.data) {
           setSaldosBanco({
             inicial: data.data.saldo_inicial || '',
@@ -145,15 +151,18 @@ const ConsolidadoView = ({
   // Guardar los saldos en la base de datos
   const guardarSaldos = async () => {
     if (!directorId || trimestreCerrado) return;
-    
+
     setSavingSaldos(true);
     setMensajeSaldos('');
     setErrorSaldos('');
-    
+
     try {
       const res = await fetch(SALDOS_API_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
         body: JSON.stringify({
           directorId,
           trimestreId,
@@ -167,12 +176,12 @@ const ConsolidadoView = ({
           }
         })
       });
-      
-      const contentType = res.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
+
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
         const data = await res.json();
         if (res.ok && data.success) {
-          setMensajeSaldos('Saldos de Cuenta Corriente guardados con éxito.');
+          setMensajeSaldos('Saldos de Cuenta Corriente guardados con exito.');
           setTimeout(() => setMensajeSaldos(''), 3000);
         } else {
           throw new Error(data.message || 'Error del servidor al guardar los saldos.');
@@ -181,7 +190,7 @@ const ConsolidadoView = ({
         if (res.status === 404) {
           throw new Error('Error 404: La ruta de saldos-banco no existe en el backend.');
         }
-        throw new Error(`Error del servidor (Código ${res.status}). Revisa la consola de tu backend.`);
+        throw new Error(`Error del servidor (Codigo ${res.status}). Revisa la consola de tu backend.`);
       }
     } catch (err) {
       console.error('Error guardando saldos', err);
@@ -191,15 +200,159 @@ const ConsolidadoView = ({
     }
   };
 
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF();
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('REPORTE CONSOLIDADO TRIMESTRAL', 14, 20);
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Institucion Educativa: ${schoolName || 'No disponible'}`, 14, 28);
+    doc.text(`Periodo: ${actual.label} 2026`, 14, 34);
+
+    const tabla1Body = [
+      [{ content: 'INGRESOS', colSpan: 2, styles: { fillColor: [241, 245, 249], fontStyle: 'bold', textColor: [15, 23, 42] } }],
+      ['+ Saldo inicial del trimestre', `S/. ${formatCurrency(saldoInicialCaja)}`],
+      ...actual.meses.map((mes, index) => [`+ Correspondiente a ${mes}`, `S/. ${formatCurrency(movimientos.ingresos[index])}`]),
+      [{ content: `Total Ingresos del ${actual.label}`, styles: { fontStyle: 'bold' } }, { content: `S/. ${formatCurrency(totalIngresos)}`, styles: { fontStyle: 'bold', halign: 'right' } }],
+      [{ content: 'EGRESOS', colSpan: 2, styles: { fillColor: [241, 245, 249], fontStyle: 'bold', textColor: [15, 23, 42] } }],
+      ...actual.meses.map((mes, index) => [`- Correspondiente a ${mes}`, `S/. ${formatCurrency(movimientos.egresos[index])}`]),
+      [{ content: `Total Egresos del ${actual.label}`, styles: { fontStyle: 'bold' } }, { content: `S/. ${formatCurrency(totalEgresos)}`, styles: { fontStyle: 'bold', halign: 'right' } }],
+      [{ content: 'Saldo final del Trimestre', styles: { fillColor: [15, 23, 42], fontStyle: 'bold', textColor: [255, 255, 255] } }, { content: `S/. ${formatCurrency(dineroEnCaja)}`, styles: { fillColor: [15, 23, 42], fontStyle: 'bold', textColor: [255, 255, 255], halign: 'right' } }]
+    ];
+
+    autoTable(doc, {
+      startY: 42,
+      head: [[{ content: '1. DETALLE DE LOS MOVIMIENTOS DE CAJA', colSpan: 2, styles: { halign: 'center', fillColor: [2, 132, 199] } }]],
+      body: tabla1Body,
+      theme: 'grid'
+    });
+
+    const tabla2Body = [
+      ['Saldo inicial en CTA. CTE.', `S/. ${formatCurrency(saldosBanco.inicial || 0)}`],
+      ...actual.meses.map((mes, index) => [`Saldo al terminar ${mes}`, `S/. ${formatCurrency(saldosBanco[`mes${index}`] || 0)}`])
+    ];
+
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 10,
+      head: [[{ content: '2. DETALLE DE LOS MOVIMIENTOS DE LA CUENTA CORRIENTE', colSpan: 2, styles: { halign: 'center', fillColor: [2, 132, 199] } }]],
+      body: tabla2Body,
+      theme: 'grid'
+    });
+
+    const tabla3Body = [
+      ['Dinero en Caja', `S/. ${formatCurrency(dineroEnCaja)}`],
+      ['Dinero en Cuenta Corriente del Banco de la Nacion', `S/. ${formatCurrency(dineroEnBanco)}`],
+      [{ content: `Saldo de Dinero, al ${actual.fin} 2026`, styles: { fillColor: [15, 23, 42], fontStyle: 'bold', textColor: [255, 255, 255] } }, { content: `S/. ${formatCurrency(saldoDineroTotal)}`, styles: { fillColor: [15, 23, 42], fontStyle: 'bold', textColor: [255, 255, 255], halign: 'right' } }]
+    ];
+
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 10,
+      head: [[{ content: '3. CONSOLIDADO', colSpan: 2, styles: { halign: 'center', fillColor: [2, 132, 199] } }]],
+      body: tabla3Body,
+      theme: 'grid'
+    });
+
+    const nombreSeguro = (schoolName || 'IE').replace(/["<>|:*?\\/]/g, '').trim().replace(/\s+/g, '_');
+    doc.save(`Consolidado_${actual.label.replace(/ /g, '_')}_${nombreSeguro}.pdf`);
+  };
+
+  const handleDownloadExcel = async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Consolidado', {
+      views: [{ state: 'frozen', xSplit: 0, ySplit: 4 }] // Congela las primeras 4 filas
+    });
+
+    ws.columns = [
+      { key: 'concepto', width: 55 },
+      { key: 'importe', width: 20 }
+    ];
+
+    ws.mergeCells('A1:B1');
+    const titleCell = ws.getCell('A1');
+    titleCell.value = 'REPORTE CONSOLIDADO TRIMESTRAL';
+    titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0284C7' } }; // sky-600
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    ws.mergeCells('A2:B2');
+    ws.getCell('A2').value = `Institución Educativa: ${schoolName || 'No disponible'}`;
+    ws.getCell('A2').font = { bold: true };
+
+    ws.mergeCells('A3:B3');
+    ws.getCell('A3').value = `Periodo: ${actual.label} 2026`;
+    ws.getCell('A3').font = { bold: true };
+
+    ws.addRow([]); // Fila 4 de separación
+
+    const addSectionHeader = (title) => {
+      const row = ws.addRow([title]);
+      ws.mergeCells(`A${row.number}:B${row.number}`);
+      row.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } }; // slate-900
+      row.getCell(1).alignment = { horizontal: 'center' };
+    };
+
+    const addSubHeader = (title) => {
+      const row = ws.addRow([title]);
+      ws.mergeCells(`A${row.number}:B${row.number}`);
+      row.getCell(1).font = { bold: true };
+      row.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+    };
+
+    addSectionHeader('1. DETALLE DE LOS MOVIMIENTOS DE CAJA');
+    addSubHeader('INGRESOS');
+    ws.addRow(['+ Saldo inicial del trimestre', Number(saldoInicialCaja)]);
+    actual.meses.forEach((mes, index) => ws.addRow([`+ Correspondiente a ${mes}`, Number(movimientos.ingresos[index])]));
+    ws.addRow([`Total Ingresos del ${actual.label}`, Number(totalIngresos)]).font = { bold: true, color: { argb: 'FF065F46' } };
+    
+    addSubHeader('EGRESOS');
+    actual.meses.forEach((mes, index) => ws.addRow([`- Correspondiente a ${mes}`, Number(movimientos.egresos[index])]));
+    ws.addRow([`Total Egresos del ${actual.label}`, Number(totalEgresos)]).font = { bold: true, color: { argb: 'FF9F1239' } };
+    ws.addRow(['Saldo final del Trimestre', Number(dineroEnCaja)]).font = { bold: true };
+    
+    ws.addRow([]);
+    addSectionHeader('2. DETALLE DE LOS MOVIMIENTOS DE LA CUENTA CORRIENTE');
+    ws.addRow(['Saldo inicial en CTA. CTE.', Number(saldosBanco.inicial || 0)]);
+    actual.meses.forEach((mes, index) => ws.addRow([`Saldo al terminar ${mes}`, Number(saldosBanco[`mes${index}`] || 0)]));
+    
+    ws.addRow([]);
+    addSectionHeader('3. CONSOLIDADO');
+    ws.addRow(['Dinero en Caja', Number(dineroEnCaja)]);
+    ws.addRow(['Dinero en Cuenta Corriente del Banco de la Nación', Number(dineroEnBanco)]);
+    const rowTotal = ws.addRow([`Saldo de Dinero, al ${actual.fin} 2026`, Number(saldoDineroTotal)]);
+    rowTotal.font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+    rowTotal.eachCell(c => c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } });
+
+    // Dar formato moneda y bordes a toda la tabla
+    ws.eachRow((row, rowNumber) => {
+      const cell = row.getCell(2);
+      if (typeof cell.value === 'number') cell.numFmt = '"S/." #,##0.00';
+      if (rowNumber > 4 && row.getCell(1).value) {
+        row.eachCell(c => c.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } });
+      }
+    });
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    const nombreSeguro = (schoolName || 'IE').replace(/["<>|:*?\\/]/g, '').trim().replace(/\s+/g, '_');
+    link.download = `Consolidado_${actual.label.replace(/ /g, '_')}_${nombreSeguro}.xlsx`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
   const tdLabelClass = 'border border-slate-300 px-4 py-3 text-sm text-slate-700';
   const tdValueClass = 'border border-slate-300 px-4 py-3 text-sm text-right font-mono text-slate-900';
   const sectionHeaderClass = 'bg-gradient-to-r from-sky-600 to-cyan-600 text-white px-4 py-2 font-bold text-sm uppercase tracking-[0.18em] border border-sky-700 text-center';
 
-  // Clases dinámicas: Si está cerrado se ve normal, si está abierto se resalta en amarillo
-  const trEditableClass = trimestreCerrado 
-    ? 'hover:bg-slate-50/80 transition-colors' 
+  const trEditableClass = trimestreCerrado
+    ? 'hover:bg-slate-50/80 transition-colors'
     : 'bg-amber-50/40 hover:bg-amber-100/50 transition-colors';
-    
+
   const tdInputContainerClass = trimestreCerrado
     ? 'border border-slate-300 p-0 text-sm text-right font-mono text-slate-900 focus-within:ring-2 focus-within:ring-inset focus-within:ring-sky-500'
     : 'border border-slate-300 p-0 text-sm text-right font-mono text-slate-900 focus-within:ring-2 focus-within:ring-inset focus-within:ring-amber-500';
@@ -268,7 +421,7 @@ const ConsolidadoView = ({
               <tr>
                 <td colSpan="2" className="p-0 border border-slate-300">
                   <div className="flex justify-between items-center text-[11px] px-4 py-2 bg-slate-50 text-slate-600">
-                    <span>Según el Estado de Cuenta mensual emitido por el Banco de la Nación:</span>
+                    <span>Segun el Estado de Cuenta mensual emitido por el Banco de la Nacion:</span>
                     {!trimestreCerrado && (
                       <span className="flex items-center gap-1.5 font-bold text-amber-700 bg-amber-100/80 px-2.5 py-0.5 rounded-md border border-amber-200">
                         <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
@@ -278,7 +431,7 @@ const ConsolidadoView = ({
                   </div>
                 </td>
               </tr>
-              
+
               <tr className={trEditableClass}>
                 <td className={tdLabelClass}>Saldo inicial en CTA. CTE.</td>
                 <td className={tdInputContainerClass}>
@@ -321,7 +474,7 @@ const ConsolidadoView = ({
                   </td>
                 </tr>
               ))}
-              
+
               <tr>
                 <td colSpan="2" className="bg-slate-50 border border-slate-300 px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-4">
@@ -393,6 +546,24 @@ const ConsolidadoView = ({
           >
             {cerrandoTrimestre ? 'Cerrando...' : 'Cerrar Trimestre'}
           </button>
+
+          <div className="flex gap-4 pt-4 border-t border-slate-200 mt-6">
+            <button
+              type="button"
+              onClick={handleDownloadPDF}
+              className="flex-1 flex items-center justify-center gap-2 rounded-2xl border-2 border-red-600 text-red-600 bg-white py-3.5 text-sm font-bold uppercase tracking-wide hover:bg-red-50 hover:shadow-md transition-all"
+            >
+              <FileText size={20} /> Descargar Consolidado (PDF)
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadExcel}
+              className="flex-1 flex items-center justify-center gap-2 rounded-2xl border-2 border-emerald-600 text-emerald-600 bg-white py-3.5 text-sm font-bold uppercase tracking-wide hover:bg-emerald-50 hover:shadow-md transition-all"
+            >
+              <Download size={20} /> Descargar Consolidado (Excel)
+            </button>
+          </div>
         </div>
       </div>
     </div>

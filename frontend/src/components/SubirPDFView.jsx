@@ -29,7 +29,9 @@ const SubirPDFView = ({ trimestreMeses, trimestreId, directorId }) => {
           trimestreId
         });
 
-        const response = await fetch(buildApiUrl(`/api/sustentos?${query.toString()}`));
+        const response = await fetch(buildApiUrl(`/api/sustentos?${query.toString()}`), {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
         const data = await response.json();
 
         if (response.ok && data.success) {
@@ -79,6 +81,9 @@ const SubirPDFView = ({ trimestreMeses, trimestreId, directorId }) => {
       try {
         const response = await fetch(buildApiUrl('/api/sustentos/upload'), {
           method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
           body: formData,
         });
         const data = await response.json();
@@ -143,6 +148,9 @@ const SubirPDFView = ({ trimestreMeses, trimestreId, directorId }) => {
     try {
       const response = await fetch(buildApiUrl(`/api/sustentos/${id}?directorId=${directorId}`), {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
       });
       const data = await response.json();
 

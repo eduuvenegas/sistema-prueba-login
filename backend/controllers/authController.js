@@ -1,5 +1,6 @@
 const { pool } = require('../config/db');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 /**
  * LOGIN
@@ -83,11 +84,19 @@ const login = async (req, res) => {
 
     connection.release();
 
+    // Generar el Token JWT ahora que ya tenemos todos los datos
+    const token = jwt.sign(
+      { id: usuario.id, correo: usuario.email, rol: usuario.rol },
+      process.env.JWT_SECRET || 'firma_secreta_ugel_2026', // Idealmente pon esto en tu .env
+      { expiresIn: '8h' }
+    );
+
     // Login exitoso — devolver datos seguros (sin contraseña)
     console.log('✅ Login exitoso para:', correo.trim());
     return res.status(200).json({
       success: true,
       message: 'Inicio de sesión exitoso.',
+      token: token, // ¡Enviamos el token al frontend!
       user: {
         id: usuario.id,
         email: usuario.email,

@@ -1,7 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Plus, Save, CalendarDays, X } from 'lucide-react';
+import { Plus, Save, CalendarDays, X, Download, FileText } from 'lucide-react';
 import { buildApiUrl } from '../config/api';
 import Toast from './Toast';
+import { jsPDF } from 'jspdf';
+import { autoTable } from 'jspdf-autotable';
+import ExcelJS from 'exceljs';
 
 const API_URL = buildApiUrl('/api/movimientos/ingresos');
 
@@ -67,7 +70,7 @@ const leerRespuestaJson = async (response) => {
   }
 };
 
-const IngresosView = ({ trimestreMeses, trimestreId, directorId, trimestreCerrado }) => {
+const IngresosView = ({ trimestreMeses, trimestreId, directorId, trimestreCerrado, schoolName }) => {
   const dateInputRefs = useRef({});
   const [mesActivo, setMesActivo] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -117,7 +120,9 @@ const IngresosView = ({ trimestreMeses, trimestreId, directorId, trimestreCerrad
           endDate: ultimoMes.endDate,
         });
 
-        const response = await fetch(`${API_URL}?${query.toString()}`);
+        const response = await fetch(`${API_URL}?${query.toString()}`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
         const data = await leerRespuestaJson(response);
 
         if (!response.ok || !data.success) {
@@ -265,6 +270,7 @@ const IngresosView = ({ trimestreMeses, trimestreId, directorId, trimestreCerrad
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({
           directorId,
@@ -287,6 +293,111 @@ const IngresosView = ({ trimestreMeses, trimestreId, directorId, trimestreCerrad
     } finally {
       setSaving(false);
     }
+  };
+
+  // Funciones placeholder para la exportación
+  const handleDownloadPDF = () => {
+    const doc = new jsPDF();
+    
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`RELACIÓN DE INGRESOS - ${trimestreMeses[mesActivo].toUpperCase()}`, 14, 20);
+    
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Sistema de Gestión Financiera Educativa', 14, 28);
+
+    // Filtrar filas válidas y mapear datos
+    const tableData = datosMeses[mesActivo]
+      .filter(fila => filaTieneContenido(fila))
+      .map((fila, index) => [
+        index + 1,
+        fila.fecha ? formatearFechaDDMM(fila.fecha) : '',
+        fila.tipo || '',
+        fila.numero || '',
+        fila.concepto || '',
+        `S/. ${Number(fila.importe || 0).toFixed(2)}`
+      ]);
+
+    autoTable(doc, {
+      startY: 35,
+      head: [['N°', 'Fecha', 'Tipo Comprobante', 'N° Comprobante', 'Concepto', 'Importe']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [5, 150, 105] }, // Color emerald-600
+      foot: [['', '', '', '', 'TOTAL INGRESOS', `S/. ${calcularTotal(mesActivo).toFixed(2)}`]],
+      footStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold' } // slate-900
+    });
+
+    const nombreSeguro = (schoolName || 'IE').replace(/["<>|:*?\\/]/g, '').trim().replace(/\s+/g, '_');
+    doc.save(`Ingresos_${trimestreMeses[mesActivo]}_${nombreSeguro}.pdf`);
+  };
+
+  const handleDownloadExcel = async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('Ingresos', {
+      views: [{ state: 'frozen', xSplit: 0, ySplit: 5 }] // Congela cabecera
+    });
+
+    // Intento de cargar logo de la UGEL
+    try {
+      const logoRes = await fetch('https://ugelsanta.gob.pe/wp-content/uploads/2026/02/Logo_US3.png');
+      const logoBuffer = await logoRes.arrayBuffer();
+      const logoId = wb.addImage({ buffer: logoBuffer, extension: 'png' });
+      ws.addImage(logoId, { tl: { col: 0.1, row: 0.1 }, ext: { width: 90, height: 35 } });
+    } catch (e) {
+      console.log('El logo no se pudo incrustar (CORS protegido por el servidor UGEL). Se omitirá.');
+    }
+
+    ws.columns = [
+      { header: '', key: 'n', width: 5 },
+      { header: '', key: 'fecha', width: 15 },
+      { header: '', key: 'tipo', width: 25 },
+      { header: '', key: 'num', width: 20 },
+      { header: '', key: 'concepto', width: 40 },
+      { header: '', key: 'importe', width: 18 }
+    ];
+
+    ws.mergeCells('A1:F1');
+    ws.getCell('A1').value = `RELACIÓN DE INGRESOS - ${trimestreMeses[mesActivo].toUpperCase()}`;
+    ws.getCell('A1').font = { size: 14, bold: true };
+    ws.getCell('A1').alignment = { horizontal: 'center' };
+    
+    ws.mergeCells('A2:F2');
+    ws.getCell('A2').value = 'Sistema de Gestión Financiera Educativa';
+    ws.getCell('A2').alignment = { horizontal: 'center' };
+
+    ws.addRow([]); ws.addRow([]); // Espacio debajo del título
+
+    const headerRow = ws.addRow(['N°', 'Fecha', 'Tipo Comprobante', 'N° Comprobante', 'Concepto', 'Importe']);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF059669' } }; // emerald-600
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+    });
+
+    datosMeses[mesActivo].filter(fila => filaTieneContenido(fila)).forEach((fila, index) => {
+      const row = ws.addRow([ index + 1, fila.fecha ? formatearFechaDDMM(fila.fecha) : '', fila.tipo || '', fila.numero || '', fila.concepto || '', Number(fila.importe || 0) ]);
+      row.getCell(6).numFmt = '"S/." #,##0.00';
+      row.eachCell(c => c.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } });
+    });
+
+    const rowTotal = ws.addRow(['', '', '', '', 'TOTAL INGRESOS', Number(calcularTotal(mesActivo))]);
+    rowTotal.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    rowTotal.getCell(5).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+    rowTotal.getCell(6).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+    rowTotal.getCell(6).numFmt = '"S/." #,##0.00';
+    rowTotal.eachCell({ includeEmpty: false }, c => c.border = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } });
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    const nombreSeguro = (schoolName || 'IE').replace(/["<>|:*?\\/]/g, '').trim().replace(/\s+/g, '_');
+    link.download = `Ingresos_${trimestreMeses[mesActivo]}_${nombreSeguro}.xlsx`;
+    link.click();
+    URL.revokeObjectURL(link.href);
   };
 
   const inputClass = 'w-full p-2 outline-none bg-transparent text-slate-800 font-medium focus:bg-white focus:ring-2 focus:ring-emerald-500/20 rounded transition-all';
@@ -315,13 +426,29 @@ const IngresosView = ({ trimestreMeses, trimestreId, directorId, trimestreCerrad
           <h2 className="text-lg font-bold text-slate-800 uppercase tracking-wide">
             RELACIÓN DE INGRESOS - {trimestreMeses[mesActivo].toUpperCase()}
           </h2>
-          <button
-            onClick={() => agregarFila(mesActivo)}
-            disabled={trimestreCerrado}
-            className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-sm hover:bg-emerald-700 transition-all shadow-md font-bold disabled:cursor-not-allowed disabled:bg-slate-400"
-          >
-            <Plus size={18} /> Agregar Fila
-          </button>
+          
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleDownloadPDF}
+              className="flex items-center gap-2 bg-white text-red-600 border border-red-200 px-4 py-2.5 rounded-xl text-sm hover:bg-red-50 transition-all shadow-sm font-bold"
+            >
+              <FileText size={18} /> PDF
+            </button>
+            <button
+              onClick={handleDownloadExcel}
+              className="flex items-center gap-2 bg-white text-emerald-700 border border-emerald-200 px-4 py-2.5 rounded-xl text-sm hover:bg-emerald-50 transition-all shadow-sm font-bold"
+            >
+              <Download size={18} /> Excel
+            </button>
+            <div className="w-px h-8 bg-slate-300 mx-1"></div>
+            <button
+              onClick={() => agregarFila(mesActivo)}
+              disabled={trimestreCerrado}
+              className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-xl text-sm hover:bg-emerald-700 transition-all shadow-md font-bold disabled:cursor-not-allowed disabled:bg-slate-400"
+            >
+              <Plus size={18} /> Agregar Fila
+            </button>
+          </div>
         </div>
 
         {trimestreCerrado && (

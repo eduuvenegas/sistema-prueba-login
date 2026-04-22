@@ -8,15 +8,17 @@ const {
   guardarSaldosBanco
 } = require('../controllers/movimientosController');
 
+const { verificarToken } = require('../middlewares/authMiddleware');
+
 const router = express.Router();
 
-router.get('/cierres/estado', obtenerCierreTrimestral);
-router.post('/cierres', cerrarTrimestre);
+router.get('/cierres/estado', verificarToken, obtenerCierreTrimestral);
+router.post('/cierres', verificarToken, cerrarTrimestre);
 
-router.get('/saldos-banco', obtenerSaldosBanco);
-router.post('/saldos-banco', guardarSaldosBanco);
+router.get('/saldos-banco', verificarToken, obtenerSaldosBanco);
+router.post('/saldos-banco', verificarToken, guardarSaldosBanco);
 
-router.get('/:tipo', listarMovimientos);
-router.post('/:tipo/replace-range', guardarMovimientos);
+router.get('/:tipo', verificarToken, listarMovimientos);
+router.post('/:tipo/replace-range', verificarToken, guardarMovimientos);
 
 module.exports = router;

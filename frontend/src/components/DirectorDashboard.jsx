@@ -58,7 +58,9 @@ const DirectorDashboard = ({ user, onLogout }) => {
           trimestreId: String(trimestreId),
         });
 
-        const response = await fetch(`${CIERRES_API_URL}/estado?${query.toString()}`);
+        const response = await fetch(`${CIERRES_API_URL}/estado?${query.toString()}`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
         const data = await leerRespuestaJson(response);
 
         if (!response.ok || !data.success) {
@@ -88,6 +90,7 @@ const DirectorDashboard = ({ user, onLogout }) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
         body: JSON.stringify({
           directorId: user.director.id,
@@ -168,6 +171,7 @@ const DirectorDashboard = ({ user, onLogout }) => {
             trimestreId={trimestreId}
             directorId={user.director?.id}
             trimestreCerrado={trimestreCerrado}
+            schoolName={user.director?.school}
           />
         )}
 
@@ -198,6 +202,7 @@ const DirectorDashboard = ({ user, onLogout }) => {
             trimestreId={trimestreId}
             directorId={user.director?.id}
             trimestreCerrado={trimestreCerrado}
+            schoolName={user.director?.school}
           />
         )}
         {activeTab === 'facturas' && (

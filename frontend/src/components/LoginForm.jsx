@@ -29,6 +29,10 @@ const LoginForm = ({ onLoginSuccess }) => {
       const data = await response.json();
 
       if (response.ok && data.success) {
+        // Guardar el token (JWT) y los datos del usuario para persistir la sesión al pulsar F5
+        if (data.token) localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+
         // Pequeña pausa artificial para mostrar la animación fluida antes de cambiar de vista
         setTimeout(() => {
           onLoginSuccess(data.user);

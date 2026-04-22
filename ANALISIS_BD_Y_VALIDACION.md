@@ -103,20 +103,9 @@ const { correo, password } = req.body;
 
 ### Flujo Actual (SIN BACKEND):
 ```
-Frontend Input (DNI) 
-    ↓
-MOCK_USERS Validation (Local)
-    ↓
-✗ NO conecta a BD MySQL
-✗ NO valida contra directores.json
-✗ NO registra login_logs
-```
-
-### Flujo Deseado (CON BACKEND):
-```
 Frontend Input (correo + contraseña)
     ↓
-POST /api/auth/login (Backend)
+POST /api/auth/login (Backend) ✓
     ↓
 Valida contra directores.json ✓
     ↓
@@ -225,43 +214,12 @@ SELECT * FROM directores;
 ```
 
 ### Paso 2: Backend ✓
-- [ ] Instalar dependencias: `npm install` en carpeta `backend/`
-- [ ] Iniciar servidor: `npm start` (debe escuchar en puerto 5000)
-- [ ] Verificar GET http://localhost:5000/ devuelve mensaje
 
-### Paso 3: Frontend ❌ (REQUIERE CAMBIO)
-- [ ] Cambiar LoginForm.jsx para conectar al backend
-- [ ] Enviar correo en lugar de userId
-- [ ] Hacer POST a `http://localhost:5000/api/auth/login`
+### Paso 3: Frontend ⚠️ (REQUIERE MEJORA)
+- [x] Cambiar LoginForm.jsx para conectar al backend (¡Completado!)
+- [x] Enviar correo validado hacia la API (¡Completado!)
+- [ ] **NUEVO:** Implementar `localStorage` para mantener la sesión al actualizar.
 
----
-
-## 📝 CAMBIOS RECOMENDADOS EN FRONTEND
-
-### Problema: LoginForm.jsx usa datos MOCK
-
-**Actual (Incorrecto):**
-```javascript
-const user = MOCK_USERS.find(u => u.id === userId && u.password === password);
-```
-
-**Debe ser (Correcto):**
-```javascript
-const response = await fetch('http://localhost:5000/api/auth/login', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ 
-    correo: userId,      // CAMBIAR a correo
-    password: password 
-  })
-});
-const data = await response.json();
-if (data.success) {
-  onLoginSuccess(data.director);
-}
-```
-
----
 
 ## 🎯 RESUMEN FINAL
 
@@ -277,12 +235,11 @@ if (data.success) {
 | Aspecto | Estado | Acción |
 |---------|--------|--------|
 | Backend valida correctamente | ✅ Sí | Iniciar servidor |
-| Frontend conecta al backend | ❌ NO | **CAMBIAR LoginForm.jsx** |
+| Frontend conecta al backend | ✅ Sí | LoginForm ya envía peticiones |
 | Sincronización a BD | ✅ Automática | Funcionará al usar backend |
-| Auditoría de logins | ✅ Disponible | Se registra automáticamente |
-| **TOTAL SESIÓN** | **⚠️ PARCIAL** | **Requiere cambios en frontend** |
+| Persistencia de sesión (F5) | ❌ NO | **Implementar localStorage** |
+| **TOTAL SESIÓN** | **⚠️ CASI LISTO** | **Requiere ajustes en App.jsx** |
 
----
 
 ## 🔗 ARCHIVOS CRÍTICOS
 
@@ -299,10 +256,9 @@ backend/
 
 frontend/
 ├── src/
-│   ├── components/
-│   │   └── LoginForm.jsx       ← ⚠️ REQUIERE CAMBIOS
-│   └── data/
-│       └── users.js            ← MOCK (no usar)
+│   ├── App.jsx                 ← ⚠️ REQUIERE CAMBIOS (Añadir localStorage)
+│   └── components/
+│       └── LoginForm.jsx       ← ✅ Ya configurado
 ```
 
 ---

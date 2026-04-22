@@ -5,7 +5,10 @@ node_modules/
 .env
 
 # Archivos subidos por los usuarios (PDFs)
-uploads/
+uploads/*
+!uploads/pdfs/
+uploads/pdfs/*
+!uploads/pdfs/.gitkeep
 
 # Logs de errores
 npm-debug.log*
