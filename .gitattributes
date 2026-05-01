@@ -1,0 +1,9 @@
+# Ignorar archivos compilados o de terceros en las estadísticas de lenguajes
+frontend/node_modules/** linguist-vendored
+frontend/.cache/** linguist-vendored
+frontend/build/** linguist-vendored
+
+# (Opcional) Forzar a que GitHub reconozca archivos específicos
+# Por ejemplo, tratar todos los archivos .jsx como código detectable
+*.jsx linguist-language=JavaScript
+*.css linguist-detectable=true
