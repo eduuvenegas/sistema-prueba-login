@@ -1,6 +1,16 @@
 const { pool } = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
+
+// Configuración de Nodemailer
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
 const obtenerTieneColumnaDebeCambiarPassword = async (connection) => {
   const [columns] = await connection.execute(
@@ -295,4 +305,128 @@ const changePassword = async (req, res) => {
   }
 };
 
-module.exports = { login, changePassword };
+/**
+ * SOLICITAR RECUPERACIÓN DE CONTRASEÑA
+ * POST /api/auth/forgot-password
+ * Body: { email: "director@colegio.edu.pe" }
+ */
+const solicitarRecuperacion = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'El correo es requerido.' });
+  }
+
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    const [users] = await connection.execute('SELECT id, email FROM usuarios WHERE email = ?', [email]);
+
+    if (users.length === 0) {
+      connection.release();
+      return res.status(404).json({ success: false, message: 'No existe una cuenta con este correo.' });
+    }
+
+    // Generar código de 6 dígitos
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expireTime = new Date();
+    expireTime.setMinutes(expireTime.getMinutes() + 15); // Expira en 15 min
+
+    // Guardar en la base de datos
+    await connection.execute(
+      'UPDATE usuarios SET reset_code = ?, reset_expires = ? WHERE id = ?',
+      [resetCode, expireTime, users[0].id]
+    );
+
+    connection.release();
+    connection = null;
+
+    // Enviar el correo
+    await transporter.sendMail({
+      from: `"UGEL Soporte" <${process.env.EMAIL_USER}>`,
+      to: email,
+      subject: 'Código de Recuperación de Contraseña',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+          <div style="background-color: #1e3a8a; padding: 25px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px; letter-spacing: 1px;">UGEL SANTA</h1>
+          </div>
+          <div style="padding: 30px; background-color: #ffffff; color: #334155;">
+            <h2 style="margin-top: 0; color: #1e293b; font-size: 20px;">Recuperación de Contraseña</h2>
+            <p style="font-size: 16px; line-height: 1.6;">Hola,</p>
+            <p style="font-size: 16px; line-height: 1.6;">Hemos recibido una solicitud para restablecer el acceso a tu cuenta. Ingresa el siguiente código de seguridad de 6 dígitos en el sistema:</p>
+            
+            <div style="background-color: #f8fafc; padding: 20px; border-radius: 10px; text-align: center; margin: 30px 0; border: 2px dashed #cbd5e1;">
+              <span style="font-size: 36px; font-weight: bold; color: #2563eb; letter-spacing: 8px;">${resetCode}</span>
+            </div>
+            
+            <p style="font-size: 14px; color: #64748b; line-height: 1.5; margin-bottom: 0;">Este código es válido por <strong>15 minutos</strong>. Si tú no solicitaste este cambio, puedes ignorar este mensaje de forma segura.</p>
+          </div>
+          <div style="background-color: #f1f5f9; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
+            <p style="font-size: 12px; color: #64748b; margin: 0;">Sistema de Gestión de Recursos Propios<br>UGEL Santa &copy; 2026</p>
+          </div>
+        </div>
+      `
+    });
+
+    res.json({ success: true, message: 'Código enviado al correo electrónico.' });
+  } catch (error) {
+    console.error('Error enviando correo de recuperación:', error);
+    if (connection) connection.release();
+    res.status(500).json({ success: false, message: 'Error enviando el correo.' });
+  }
+};
+
+/**
+ * RESTABLECER LA CONTRASEÑA
+ * POST /api/auth/reset-password
+ * Body: { email: "director@...", codigo: "123456", nuevaPassword: "nueva" }
+ */
+const restablecerPassword = async (req, res) => {
+  const { email, codigo, nuevaPassword } = req.body;
+
+  if (!email || !codigo || !nuevaPassword) {
+    return res.status(400).json({ success: false, message: 'Todos los campos son requeridos.' });
+  }
+
+  let connection;
+  try {
+    connection = await pool.getConnection();
+    const [users] = await connection.execute(
+      'SELECT id, reset_expires FROM usuarios WHERE email = ? AND reset_code = ?',
+      [email, codigo]
+    );
+
+    if (users.length === 0) {
+      connection.release();
+      return res.status(400).json({ success: false, message: 'Código incorrecto o correo inválido.' });
+    }
+
+    const usuario = users[0];
+    if (new Date() > new Date(usuario.reset_expires)) {
+      connection.release();
+      return res.status(400).json({ success: false, message: 'El código ha expirado.' });
+    }
+
+    // Encriptar la nueva contraseña
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(nuevaPassword, salt);
+
+    // Actualizar contraseña y limpiar el código de la BD
+    await connection.execute(
+      'UPDATE usuarios SET password_hash = ?, reset_code = NULL, reset_expires = NULL WHERE id = ?',
+      [hashedPassword, usuario.id]
+    );
+
+    connection.release();
+    connection = null;
+
+    res.json({ success: true, message: 'Contraseña actualizada exitosamente.' });
+  } catch (error) {
+    console.error('Error restableciendo contraseña:', error);
+    if (connection) connection.release();
+    res.status(500).json({ success: false, message: 'Error actualizando la contraseña.' });
+  }
+};
+
+module.exports = { login, changePassword, solicitarRecuperacion, restablecerPassword };

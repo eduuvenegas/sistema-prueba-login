@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User, Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { buildApiUrl } from '../config/api';
+import ForgotPassword from './ForgotPassword';
 
 const LoginForm = ({ onLoginSuccess }) => {
   const [correo, setCorreo] = useState('');
@@ -9,6 +10,7 @@ const LoginForm = ({ onLoginSuccess }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false); // Nuevo estado para animación de éxito
+  const [showForgotPassword, setShowForgotPassword] = useState(false); // Controla qué pantalla ver
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -89,6 +91,9 @@ const LoginForm = ({ onLoginSuccess }) => {
 
       {/* Lado Derecho - Formulario Minimalista */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 relative">
+        {showForgotPassword ? (
+          <ForgotPassword onBackToLogin={() => setShowForgotPassword(false)} />
+        ) : (
         <div className="w-full max-w-md bg-white p-8 sm:p-10 rounded-[2rem] shadow-xl border border-slate-200 relative">
           
           {/* Mostrar logo en móvil (ya que el lado izquierdo se oculta) */}
@@ -131,7 +136,12 @@ const LoginForm = ({ onLoginSuccess }) => {
             <div className="space-y-2 text-left relative">
               <div className="flex justify-between items-center">
                 <label className="text-sm font-bold text-slate-700 block">Contraseña</label>
-                <button type="button" className="text-blue-600 hover:text-blue-700 text-sm font-bold hover:underline transition-colors" tabIndex="-1">
+                <button 
+                  type="button" 
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-blue-600 hover:text-blue-700 text-sm font-bold hover:underline transition-colors" 
+                  tabIndex="-1"
+                >
                   ¿Olvidaste tu clave?
                 </button>
             </div>
@@ -197,6 +207,7 @@ const LoginForm = ({ onLoginSuccess }) => {
             </p>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
